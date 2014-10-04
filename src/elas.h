@@ -170,6 +170,20 @@ private:
     support_pt(int32_t u,int32_t v,int32_t d):u(u),v(v),d(d){}
   };
 
+  struct support_pt_flow {
+    int32_t u;
+    int32_t v;
+    int32_t d_x;
+    int32_t d_y;
+    support_pt_flow(int32_t u, int32_t v, int32_t d_x, int32_t d_y):u(u), v(v), d_x(d_x), d_y(d_y){}
+  };
+
+  /**
+   * @brief The triangle struct, 不知道参数是什么意思
+   * @param c1, c2, c3每个三角的点的index，counterclockwise的顺序
+   * @param t1a, t1b, t1c左图像视差平面的参数
+   * @param t2a, t2b, t2c右图像视差平面的参数
+   */
   struct triangle {
     int32_t c1,c2,c3;
     float   t1a,t1b,t1c;
@@ -177,6 +191,13 @@ private:
     triangle(int32_t c1,int32_t c2,int32_t c3):c1(c1),c2(c2),c3(c3){}
   };
 
+  /**
+   * @brief 用于在二维矩阵的时候，把二维坐标转换为一维坐标
+   * @param u
+   * @param v
+   * @param width
+   * @return 二维坐标所表示的一维偏移
+   */
   inline uint32_t getAddressOffsetImage (const int32_t& u,const int32_t& v,const int32_t& width) {
     return v*width+u;
   }

@@ -39,6 +39,17 @@ Descriptor::~Descriptor() {
   _mm_free(I_desc);
 }
 
+/**
+ * @brief Descriptor::createDescriptor
+ * @param I_du
+ *      图像在x轴方向的梯度图
+ * @param I_dv
+ *      图像在y轴方向的梯度图
+ * @param width
+ * @param height
+ * @param bpl
+ * @param half_resolution
+ */
 void Descriptor::createDescriptor (uint8_t* I_du,uint8_t* I_dv,int32_t width,int32_t height,int32_t bpl,bool half_resolution) {
 
   uint8_t *I_desc_curr;  

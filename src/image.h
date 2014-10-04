@@ -101,7 +101,6 @@ template <class T> void image<T>::init(const T &val) {
     *ptr++ = val;
 }
 
-
 template <class T> image<T> *image<T>::copy() const {
   image<T> *im = new image<T>(w, h, false);
   memcpy(im->data, data, w * h * sizeof(T));

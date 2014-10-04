@@ -28,7 +28,16 @@ Street, Fifth Floor, Boston, MA 02110-1301, USA
 
 using namespace std;
 
-void Elas::process (uint8_t* I1_,uint8_t* I2_,float* D1,float* D2,const int32_t* dims){
+/**
+ * @brief Elas::process
+ * @param I1_
+ * @param I2_
+ * @param D1
+ * @param D2
+ * @param dims
+ * @see https://software.intel.com/sites/landingpage/IntrinsicsGuide/
+ */
+void Elas::process (uint8_t* I1_,uint8_t* I2_,float* D1,float* D2,const int32_t* dims) {
   
   // get width, height and bytes per line
   width  = dims[0];
@@ -37,26 +46,31 @@ void Elas::process (uint8_t* I1_,uint8_t* I2_,float* D1,float* D2,const int32_t*
   // if width = 10, bpl = 10 + 6 = 16
   // if width = 20, bpl = 20 + (15-3) = 32
   // 计算结果为每行的字节数都为16的整数倍
-  //
 
   // copy images to byte aligned memory
   // I1和I2是成员变量！红色的是成员变量！
   I1 = (uint8_t*)_mm_malloc(bpl*height*sizeof(uint8_t),16);
   I2 = (uint8_t*)_mm_malloc(bpl*height*sizeof(uint8_t),16);
-  memset (I1,0,bpl*height*sizeof(uint8_t));
-  memset (I2,0,bpl*height*sizeof(uint8_t));
+  memset(I1,0,bpl*height*sizeof(uint8_t));
+  memset(I2,0,bpl*height*sizeof(uint8_t));
   if (bpl==dims[2]) {
     // 1. 这里进行了内存复制，那么之前的清零就显得没有必要了
     // 2. 进行这个判断主要是为了看每行字节数是否为16的整数倍
     memcpy(I1,I1_,bpl*height*sizeof(uint8_t));
     memcpy(I2,I2_,bpl*height*sizeof(uint8_t));
   } else {
+      // 如果不相等，则有一部分空间不会被复制到，前面的清零就有意义
     for (int32_t v=0; v<height; v++) {
       // 把width byte的内存复制到新图像里，
-      // 这里I1中每行还是bpl的空间，但是width用的太草率，应该是用dims[2]才对
+      // 这里I1中每行还是bpl的空间，bpl>dims[2]
+      // 这里不能用width，应该是用dims[2]才对
+      // dims[2]表示bytes per line，实际上和width相等，但含义不同
       /** @bug width 应该改为dims[2]*/
-      memcpy(I1+v*bpl,I1_+v*dims[2],width*sizeof(uint8_t));
-      memcpy(I2+v*bpl,I2_+v*dims[2],width*sizeof(uint8_t));
+      /** memcpy(I1+v*bpl,I1_+v*dims[2],width*sizeof(uint8_t));
+          memcpy(I2+v*bpl,I2_+v*dims[2],width*sizeof(uint8_t));
+      */
+      memcpy(I1+v*bpl,I1_+v*dims[2],dims[2]*sizeof(uint8_t));
+      memcpy(I2+v*bpl,I2_+v*dims[2],dims[2]*sizeof(uint8_t));
     }
   }
 
@@ -86,12 +100,18 @@ void Elas::process (uint8_t* I1_,uint8_t* I2_,float* D1,float* D2,const int32_t*
   vector<triangle> tri_2 = computeDelaunayTriangulation(p_support,1);
 
 #ifdef PROFILE
+  /**
+   * 计算三角所处的平面
+   */
   timer.start("Disparity Planes");
 #endif
   computeDisparityPlanes(p_support,tri_1,0);
   computeDisparityPlanes(p_support,tri_2,1);
 
 #ifdef PROFILE
+  /**
+  * @todo 这一部分没有在论文里面出现
+  */
   timer.start("Grid");
 #endif
 
@@ -187,6 +207,15 @@ void Elas::removeInconsistentSupportPoints (int16_t* D_can,int32_t D_can_width,i
   }
 }
 
+/**
+ * @brief 只是简单的检查指定的两个方向，看其是否冗余，技术含量一般般。
+ * @param D_can
+ * @param D_can_width
+ * @param D_can_height
+ * @param redun_max_dist
+ * @param redun_threshold
+ * @param vertical
+ */
 void Elas::removeRedundantSupportPoints(int16_t* D_can,int32_t D_can_width,int32_t D_can_height,
                                         int32_t redun_max_dist, int32_t redun_threshold, bool vertical) {
   
@@ -275,6 +304,19 @@ void Elas::addCornerSupportPoints(vector<support_pt> &p_support) {
     p_support.push_back(p_border[i]);
 }
 
+/**
+ * @brief Elas::computeMatchingDisparity
+ * @param u
+ *      x轴坐标
+ * @param v
+ *      y轴坐标
+ * @param I1_desc
+ *      I1的描述符
+ * @param I2_desc
+ *      I2的描述符
+ * @param right_image
+ * @return
+ */
 inline int16_t Elas::computeMatchingDisparity (const int32_t &u,const int32_t &v,uint8_t* I1_desc,uint8_t* I2_desc,const bool &right_image) {
   
   const int32_t u_step      = 2;
@@ -328,7 +370,7 @@ inline int16_t Elas::computeMatchingDisparity (const int32_t &u,const int32_t &v
     int16_t min_2_E = 32767;
     int16_t min_2_d = -1;
 
-    // get valid disparity range
+    // get valid disparity range, 这是很关键的一步，怎么确定这个范围的呢？
     int32_t disp_min_valid = max(param.disp_min,0);
     int32_t disp_max_valid = param.disp_max;
     if (!right_image) disp_max_valid = min(param.disp_max,u-window_size-u_step);
@@ -341,7 +383,7 @@ inline int16_t Elas::computeMatchingDisparity (const int32_t &u,const int32_t &v
     // for all disparities do
     for (int16_t d=disp_min_valid; d<=disp_max_valid; d++) {
 
-      // warp u coordinate
+      // warp u coordinate, 在另一幅图像里面的坐标
       if (!right_image) u_warp = u-d;
       else              u_warp = u+d;
 
@@ -357,6 +399,10 @@ inline int16_t Elas::computeMatchingDisparity (const int32_t &u,const int32_t &v
       xmm6 = _mm_add_epi16(_mm_sad_epu8(xmm3,xmm5),xmm6);
       xmm5 = _mm_load_si128((__m128i*)(I2_block_addr+desc_offset_4));
       xmm6 = _mm_add_epi16(_mm_sad_epu8(xmm4,xmm5),xmm6);
+      // 下面这一步，为何是正确的呢？
+      // 关键在_mm_sad_epu8的行为上，它会把结果分别存为两个16bit的部分，
+      // 需要分别取出
+      // @see https://software.intel.com/sites/landingpage/IntrinsicsGuide/
       sum  = _mm_extract_epi16(xmm6,0)+_mm_extract_epi16(xmm6,4);
 
       // best + second best match
@@ -379,6 +425,14 @@ inline int16_t Elas::computeMatchingDisparity (const int32_t &u,const int32_t &v
     return -1;
 }
 
+/**
+ * @brief Elas::computeSupportMatches
+ * @param I1_desc
+ *      descriptors of image I1
+ * @param I2_desc
+ *      descriptors of image I2
+ * @return
+ */
 vector<Elas::support_pt> Elas::computeSupportMatches (uint8_t* I1_desc,uint8_t* I2_desc) {
   
   // be sure that at half resolution we only need data
@@ -449,6 +503,13 @@ vector<Elas::support_pt> Elas::computeSupportMatches (uint8_t* I1_desc,uint8_t* 
   return p_support; 
 }
 
+/**
+ * @brief 根据support point计算delaunay三角化
+ * @param p_support
+ * @param right_image
+ * @return 对应的三角形
+ * @todo 可以用引用代替返回，triangle的传递可以加速
+ */
 vector<Elas::triangle> Elas::computeDelaunayTriangulation (vector<support_pt> p_support,int32_t right_image) {
 
   // input/output structure for triangulation
@@ -511,6 +572,13 @@ vector<Elas::triangle> Elas::computeDelaunayTriangulation (vector<support_pt> p_
   return tri;
 }
 
+/**
+ * @brief 填充tri中每一个三角形的平面参数
+ * @param p_support 支撑点
+ * @param tri 有支撑点得出的三角形
+ * @param right_image 其实左右都在算，这个参数并没有使用
+ * @todo 删除right_image参数
+ */
 void Elas::computeDisparityPlanes (vector<support_pt> p_support,vector<triangle> &tri,int32_t right_image) {
 
   // init matrices
@@ -687,9 +755,26 @@ inline void Elas::updatePosteriorMinimum(__m128i* I2_block_addr,const int32_t &d
   }
 }
 
+/**
+ * @brief Elas::findMatch
+ * @param u (u,v) coordinate of pixels
+ * @param v (u,v) coordinate of pixels
+ * @param plane_a
+ * @param plane_b
+ * @param plane_c
+ * @param disparity_grid
+ * @param grid_dims
+ * @param I1_desc
+ * @param I2_desc
+ * @param P
+ * @param plane_radius
+ * @param valid
+ * @param right_image
+ * @param D
+ */
 inline void Elas::findMatch(int32_t &u,int32_t &v,float &plane_a,float &plane_b,float &plane_c,
                             int32_t* disparity_grid,int32_t *grid_dims,uint8_t* I1_desc,uint8_t* I2_desc,
-                            int32_t *P,int32_t &plane_radius,bool &valid,bool &right_image,float* D){
+                            int32_t *P,int32_t &plane_radius,bool &valid,bool &right_image,float* D) {
   
   // get image width and height
   const int32_t disp_num    = grid_dims[0]-1;
@@ -809,7 +894,7 @@ void Elas::computeDisparity(vector<support_pt> p_support,vector<triangle> tri,in
   float two_sigma_squared = 2*param.sigma*param.sigma;
   int32_t* P = new int32_t[disp_num];
   for (int32_t delta_d=0; delta_d<disp_num; delta_d++)
-    P[delta_d] = (int32_t)((-log(param.gamma+exp(-delta_d*delta_d/two_sigma_squared))+log(param.gamma))/param.beta);
+      P[delta_d] = (int32_t)((-log(param.gamma+exp(-delta_d*delta_d/two_sigma_squared))+log(param.gamma))/param.beta);
   int32_t plane_radius = (int32_t)max((float)ceil(param.sigma*param.sradius),(float)2.0);
 
   // loop variables
@@ -880,7 +965,7 @@ void Elas::computeDisparity(vector<support_pt> p_support,vector<triangle> tri,in
         
     // first part (triangle corner A->B)
     if ((int32_t)(A_u)!=(int32_t)(B_u)) {
-      for (int32_t u=max((int32_t)A_u,0); u<min((int32_t)B_u,width); u++){
+      for (int32_t u=max((int32_t)A_u,0); u<min((int32_t)B_u,width); u++) {
         if (!param.subsampling || u%2==0) {
           int32_t v_1 = (uint32_t)(AC_a*(float)u+AC_b);
           int32_t v_2 = (uint32_t)(AB_a*(float)u+AB_b);
@@ -895,7 +980,7 @@ void Elas::computeDisparity(vector<support_pt> p_support,vector<triangle> tri,in
 
     // second part (triangle corner B->C)
     if ((int32_t)(B_u)!=(int32_t)(C_u)) {
-      for (int32_t u=max((int32_t)B_u,0); u<min((int32_t)C_u,width); u++){
+      for (int32_t u=max((int32_t)B_u,0); u<min((int32_t)C_u,width); u++) {
         if (!param.subsampling || u%2==0) {
           int32_t v_1 = (uint32_t)(AC_a*(float)u+AC_b);
           int32_t v_2 = (uint32_t)(BC_a*(float)u+BC_b);

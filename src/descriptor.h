@@ -51,7 +51,20 @@ class Descriptor {
 public:
   
   // constructor creates filters
-  Descriptor(uint8_t* I,int32_t width,int32_t height,int32_t bpl,bool half_resolution);
+    /**
+    * @brief Descriptor
+    * @param I
+    *   input image
+    * @param width
+    *   image width
+    * @param height
+    *   image height
+    * @param bpl
+    *   byte per line in image
+    * @param half_resolution
+    *   if hald resolution is needed
+    */
+    Descriptor(uint8_t* I,int32_t width,int32_t height,int32_t bpl,bool half_resolution);
   
   // deconstructor releases memory
   ~Descriptor();

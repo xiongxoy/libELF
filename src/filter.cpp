@@ -403,8 +403,21 @@ namespace filter {
         *(result_v+1) = _mm_add_epi16( *(result_v+1), ilo );
       }
     }
-  };
+  }
   
+  /**
+   * @brief sobel3x3
+   * @param in
+   *    输入图像
+   * @param out_v
+   *    输出垂直方向的梯度？
+   * @param out_h
+   *    输出水平方向的梯度？
+   * @param w
+   *    图像的宽
+   * @param h
+   *    图像的高
+   */
   void sobel3x3( const uint8_t* in, uint8_t* out_v, uint8_t* out_h, int w, int h ) {
     int16_t* temp_h = (int16_t*)( _mm_malloc( w*h*sizeof( int16_t ), 16 ) );
     int16_t* temp_v = (int16_t*)( _mm_malloc( w*h*sizeof( int16_t ), 16 ) );    
@@ -465,4 +478,4 @@ namespace filter {
     }
     _mm_free( integral );
   }
-};
+}
